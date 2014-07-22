@@ -1,0 +1,15 @@
+{
+  "filename": "template.json",
+  "title": "Template",
+  "resets": 0,
+  "finishes": 0,
+  "pbs": 0,
+  "playtime": 0,
+  "list": [
+    {
+      "name": "Finish",
+      "time": null,
+      "best": null
+    }
+  ]
+}
