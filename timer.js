@@ -52,14 +52,10 @@ function makeNewSplit(name, time, best, delta) {
   };
 }
 
-function loadTimes(fileName, list, splits, title) {
-  var splits = fileName
-               ? require(path.resolve(process.cwd(), fileName))
+function loadTimes(fname, list, splits, title) {
+  var splits = fname
+               ? require(path.resolve(process.cwd(), fname))
                : defaultFile;
-
-  if (!fileName) {
-    fileName = "deletethis.json";
-  }
 
   splits.current = 0;
   splits.newList = [];
@@ -134,9 +130,11 @@ function startTimer() {
 }
 
 function pauseTimer() {
-  timer.state = 'paused';
-  timer.pauseOffset += timer.toMilli() - timer.pauseOffset;
+  var t = timer.toMilli();
   timer.time = new Date();
+  timer.state = 'paused';
+  updatePlaytime(t - timer.pauseOffset);
+  timer.pauseOffset += t - timer.pauseOffset;
   clearInterval(timer.interval);
   updateTime();
 }
@@ -153,13 +151,18 @@ function resetTimes() {
   list.setItems(splitarray);
 }
 
-function updatePlaytime() {
-  splits.playtime += timer.toMilli();
+function updatePlaytime(t) {
+  if (t == null) {
+    splits.playtime += timer.toMilli() - timer.pauseOffset;
+  } else {
+    splits.playtime += t;
+  }
 }
 
 function resetTimer() {
   if (timer.state === 'going') {
     splits.resets += 1;
+    updatePlaytime();
   }
   timer.state = 'stopped';
   clearInterval(timer.interval);
@@ -275,8 +278,6 @@ function splitFn() {
     segment = t;
   } else if (splits.current !== 0 && splits.newList[splits.current - 1].time !== null) {
     segment = t - splits.newList[splits.current - 1].time;
-  } else {
-    throw new Error('dont know what to do for segment');
   }
 
   if (splits.list[splits.current].best === null || segment < splits.list[splits.current].best) {
@@ -290,11 +291,14 @@ function splitFn() {
   updateSplits();
 
   if (splits.current === splits.list.length) {
-    finish();
+    finish(t);
   }
 }
 
-function finish() {
+function finish(t) {
+  if (timer.state === 'going') {
+    updatePlaytime(t);
+  }
   timer.state = 'finished';
   if (splits.list[splits.list.length - 1].time !== null) {
     var time1 = splits.newList[splits.list.length - 1].time;
@@ -344,6 +348,14 @@ function setNewSplits() {
     splits.newList[i] = makeNewSplit(splits.list[i].name, null, null, null);
   }
   resetTimer();
+}
+
+function sumOfBest() {
+  var t = 0;
+  for (var i = 0; i < splits.list.length; i++) {
+    t += splits.list[i].best;
+  }
+  return t;
 }
 
 var title = blessed.box({
@@ -409,9 +421,12 @@ var writeFlag = 0
 
 if (process.argv[2]) {
   fileName = process.argv[2];
+  splits = loadTimes(fileName, list, splits, title);
+} else {
+  fileName = "deletethis.json";
+  splits = loadTimes(null, list, splits, title);
 }
 
-splits = loadTimes(fileName, list, splits, title);
 updateTime();
 
 screen.key('q', function() {
@@ -432,12 +447,10 @@ screen.key('space', function() {
 });
 
 screen.key('r', function() {
-  updatePlaytime();
   resetTimer();
 });
 
 screen.key('o', function() {
-  updatePlaytime();
   writeSplitsToFile();
   setNewSplits();
 });
